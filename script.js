@@ -2,265 +2,51 @@
 // RAGEBAIT WORDLE
 // A wordle that's rigged to make you ALMOST win every row
 // but you only get it on the 6th try (maybe).
+// Uses VALID_WORDS (Set) and ANSWER_WORDS (Array) from words.js
 // ============================================================
 
-// --- Word lists ---
+// ============================================================
+// PRE-COMPUTE: Build a neighbor index for fast near-miss lookups
+// For every answer word, find all answer words 1 letter away
+// ============================================================
 
-// Words that have LOTS of similar-looking cousins (max frustration)
-const TARGET_WORDS = [
-  "CRANE", "PLATE", "STARE", "SHINE", "TRACE",
-  "BLAME", "GRAPE", "BRIDE", "STONE", "PRIDE",
-  "FLAME", "GRACE", "SPINE", "SLOPE", "GLOBE",
-  "SWORE", "SNORE", "STORE", "SHORE", "SCORE",
-  "BRAKE", "FLAKE", "SHAKE", "STAKE", "SNAKE",
-  "LIGHT", "MIGHT", "NIGHT", "RIGHT", "SIGHT",
-  "BLANK", "CLANK", "CRANK", "DRANK", "PLANK",
-  "TRAIN", "BRAIN", "DRAIN", "GRAIN", "STAIN",
-  "CLOUD", "PROUD", "GROUT", "SCOUT", "SHOUT",
-  "BLINK", "CLINK", "DRINK", "THINK", "BRINK",
-  "CHARM", "SWARM", "ALARM",
-  "MOUSE", "HOUSE", "LOUSE", "DOUSE",
-  "MOUND", "BOUND", "FOUND", "HOUND", "ROUND", "SOUND", "WOUND",
-  "PASTE", "TASTE", "WASTE", "HASTE", "BASTE",
-  "LINER", "DINER", "MINER", "FINER", "TIMER",
-  "TOWER", "POWER", "LOWER", "MOWER", "BOWER",
-  "MANGO", "TANGO",
-  "PEACH", "BEACH", "REACH", "TEACH", "LEACH",
-];
+const neighborCache = new Map();
 
-// Big valid word list for checking guesses (common 5-letter words)
-const VALID_WORDS = new Set([
-  // A
-  "ABOUT","ABOVE","ABUSE","ACTED","ACUTE","ADMIT","ADOPT","ADULT","AFTER","AGAIN",
-  "AGENT","AGREE","AHEAD","ALARM","ALBUM","ALERT","ALIEN","ALIGN","ALIKE","ALIVE",
-  "ALLEY","ALLOW","ALONE","ALONG","ALTER","AMONG","ANGEL","ANGER","ANGLE","ANGRY",
-  "ANIME","ANKLE","ANNEX","ANTIC","APART","APPLE","APPLY","ARENA","ARGUE","ARISE",
-  "ARMED","ARMOR","AROMA","AROSE","ARRAY","ARROW","ARSON","ASIDE","ASKED","ASSET",
-  "ATLAS","ATTIC","AUDIO","AUDIT","AVOID","AWAKE","AWARD","AWARE","AWFUL","AXIAL",
-  // B
-  "BADGE","BADLY","BAKER","BASED","BASIC","BASIN","BASIS","BATCH","BEACH","BEGUN",
-  "BEING","BELOW","BENCH","BERRY","BIBLE","BIKES","BIRTH","BLACK","BLADE","BLAME",
-  "BLAND","BLANK","BLAST","BLAZE","BLEAK","BLEED","BLEND","BLESS","BLIND","BLINK",
-  "BLISS","BLOCK","BLOND","BLOOD","BLOOM","BLOWN","BLUES","BLUFF","BLUNT","BOARD",
-  "BOAST","BONUS","BOOST","BOOTH","BOUND","BOXER","BRACE","BRAIN","BRAKE","BRAND",
-  "BRAVE","BREAD","BREAK","BREED","BRICK","BRIDE","BRIEF","BRING","BRINK","BROAD",
-  "BROKE","BROOK","BROWN","BRUSH","BUILD","BUILT","BUNCH","BURST","BUYER",
-  // C
-  "CABIN","CABLE","CAMEL","CANDY","CARGO","CARRY","CATCH","CAUSE","CEASE","CHAIN",
-  "CHAIR","CHAOS","CHARM","CHART","CHASE","CHEAP","CHECK","CHEEK","CHEER","CHESS",
-  "CHEST","CHIEF","CHILD","CHINA","CHOIR","CHOSE","CHUNK","CIVIL","CLAIM","CLAMP",
-  "CLANK","CLASS","CLEAN","CLEAR","CLERK","CLICK","CLIFF","CLIMB","CLING","CLINK",
-  "CLOCK","CLONE","CLOSE","CLOTH","CLOUD","CLOWN","COACH","COAST","COLOR","COMET",
-  "COMIC","CORAL","COULD","COUNT","COURT","COVER","CRACK","CRAFT","CRANE","CRANK",
-  "CRASH","CRAZY","CREAM","CRIME","CRISP","CROSS","CROWD","CROWN","CRUEL","CRUSH",
-  "CURVE","CYCLE",
-  // D
-  "DAILY","DANCE","DATED","DEALT","DEATH","DEBUT","DECAY","DECOR","DECOY","DELTA",
-  "DEMON","DENSE","DEPTH","DERBY","DINER","DIRTY","DISCO","DITCH","DIVER","DODGE",
-  "DOING","DONOR","DOUBT","DOUGH","DRAFT","DRAIN","DRAKE","DRAMA","DRANK","DRAPE",
-  "DRAWN","DREAD","DREAM","DRESS","DRIED","DRIFT","DRILL","DRINK","DRIVE","DRONE",
-  "DROPS","DROWN","DRUNK","DRYER","DOUSE","DWARF","DYING",
-  // E
-  "EAGER","EAGLE","EARLY","EARTH","EATEN","EIGHT","ELBOW","ELDER","ELECT","ELITE",
-  "EMPTY","ENEMY","ENJOY","ENTER","ENTRY","EQUAL","EQUIP","ERROR","EVENT","EVERY",
-  "EXACT","EXERT","EXILE","EXIST","EXTRA",
-  // F
-  "FABLE","FACET","FAITH","FALSE","FANCY","FATAL","FAULT","FEAST","FIBER","FIELD",
-  "FIFTH","FIFTY","FIGHT","FINAL","FINER","FIRST","FIXED","FLAGS","FLAME","FLAKE",
-  "FLASH","FLASK","FLESH","FLIES","FLING","FLOAT","FLOCK","FLOOD","FLOOR","FLORA",
-  "FLOUR","FLOWN","FLUID","FLUSH","FLUTE","FOCAL","FOCUS","FORCE","FORGE","FORTY",
-  "FORUM","FOUND","FRAME","FRANK","FRAUD","FREED","FRESH","FRONT","FROST","FROZE",
-  "FRUIT","FULLY","FUNGI","FUNNY","FUZZY",
-  // G
-  "GAUGE","GHOST","GIANT","GIVEN","GLAND","GLASS","GLEAM","GLIDE","GLOBE","GLOOM",
-  "GLORY","GLOSS","GLOVE","GOING","GRACE","GRADE","GRAIN","GRAND","GRANT","GRAPE",
-  "GRAPH","GRASP","GRASS","GRAVE","GRAZE","GREAT","GREED","GREEN","GREET","GRIEF",
-  "GRILL","GRIND","GROAN","GROOM","GROSS","GROUP","GROVE","GROWL","GROWN","GROUT",
-  "GUARD","GUESS","GUEST","GUIDE","GUILD","GUILT","GUISE",
-  // H
-  "HABIT","HAPPY","HARDY","HARSH","HASTE","HATCH","HAVEN","HEART","HEAVY","HEDGE",
-  "HEIST","HENCE","HOBBY","HONOR","HORSE","HOUND","HOUSE","HUMAN","HUMID","HUMOR",
-  "HURRY",
-  // I
-  "IDEAL","IMAGE","IMPLY","INDEX","INDIE","INFRA","INNER","INPUT","INTRO","IRONY",
-  "IVORY","ISSUE",
-  // J
-  "JEWEL","JOINT","JOKER","JUDGE","JUICE","JUICY","JUMBO","JUMPS",
-  // K
-  "KAYAK","KEBAB","KNACK","KNEEL","KNIFE","KNOCK","KNOWN",
-  // L
-  "LABEL","LABOR","LANCE","LARGE","LASER","LATCH","LATER","LAUGH","LAYER","LEACH",
-  "LEARN","LEASE","LEAVE","LEVEL","LIGHT","LINEN","LINER","LIVER","LOCAL","LODGE",
-  "LOGIC","LOOSE","LORRY","LOVER","LOWER","LOYAL","LOUSE","LUCKY","LUNAR",
-  "LUNCH","LYING",
-  // M
-  "MAGIC","MAJOR","MAKER","MANOR","MARCH","MARRY","MARSH","MATCH","MAYOR","MEDIA",
-  "MERCY","MERGE","MERIT","METAL","METER","MIGHT","MINER","MINOR","MINUS","MIXED",
-  "MODEL","MONEY","MONTH","MORAL","MOTOR","MOUND","MOUNT","MOUSE","MOUTH","MOVED",
-  "MOVIE","MOWER","MUSIC","MANGO",
-  // N
-  "NAIVE","NAVAL","NERVE","NEVER","NEWLY","NIGHT","NOBLE","NOISE","NORTH","NOTED",
-  "NOVEL","NURSE",
-  // O
-  "OASIS","OCCUR","OCEAN","OFFER","OFTEN","OLIVE","ONSET","OPERA","ORBIT","ORDER",
-  "OTHER","OUGHT","OUTER","OWNED","OWNER","OXIDE",
-  // P
-  "PAINT","PANEL","PANIC","PAPER","PARTY","PASTE","PATCH","PAUSE","PEACE","PEACH",
-  "PEARL","PENNY","PHASE","PHONE","PHOTO","PIANO","PIECE","PILOT","PINCH","PITCH",
-  "PIXEL","PIZZA","PLACE","PLAIN","PLAIT","PLANE","PLANK","PLANT","PLATE","PLAZA",
-  "PLEAD","PLUMB","PLUME","PLUMP","POINT","POISE","POLAR","POUCH","POUND","POWER",
-  "PRESS","PRICE","PRIDE","PRIME","PRINT","PRIOR","PRIZE","PROBE","PRONE","PROOF",
-  "PROSE","PROUD","PROVE","PROXY","PULSE","PUNCH","PUPIL","PURSE","PUSSY",
-  // Q
-  "QUALM","QUEEN","QUERY","QUEST","QUEUE","QUICK","QUIET","QUIRK","QUOTA","QUOTE",
-  // R
-  "RADAR","RADIO","RAISE","RALLY","RANCH","RANGE","RAPID","RATIO","REACH","REACT",
-  "READY","REALM","REBEL","REFER","REIGN","RELAX","RENAL","RENEW","REPLY","RIDER",
-  "RIDGE","RIFLE","RIGHT","RIGID","RINSE","RISEN","RISKY","RIVAL","RIVER","ROAST",
-  "ROBOT","ROCKY","ROMAN","ROOMY","ROOTS","ROUGE","ROUGH","ROUND","ROUTE","ROVER",
-  "ROYAL","RUGBY","RULER","RURAL",
-  // S
-  "SAINT","SALAD","SALTY","SAUCE","SCALE","SCARE","SCENE","SCENT","SCOPE","SCORE",
-  "SCOUT","SEDAN","SENSE","SERUM","SERVE","SETUP","SEVEN","SHALL","SHAME","SHAPE",
-  "SHARE","SHARK","SHARP","SHAVE","SHEET","SHELF","SHELL","SHIFT","SHINE","SHIRT",
-  "SHOCK","SHORE","SHORT","SHOUT","SIGHT","SILLY","SINCE","SIXTH","SIXTY","SIZED",
-  "SKILL","SKULL","SLASH","SLATE","SLAVE","SLEEP","SLICE","SLIDE","SLOPE","SMALL",
-  "SMART","SMELL","SMILE","SMITH","SMOKE","SNAKE","SNORE","SOLAR","SOLID","SOLVE",
-  "SORRY","SOUND","SOUTH","SPACE","SPARE","SPARK","SPAWN","SPEAK","SPEED","SPELL",
-  "SPEND","SPENT","SPICE","SPIKE","SPINE","SPOKE","SPOON","SPORT","SPRAY","SQUAD",
-  "STAFF","STAGE","STAIN","STAKE","STALE","STALL","STAMP","STAND","STARE","START",
-  "STATE","STEAK","STEAL","STEAM","STEEL","STEEP","STEER","STERN","STICK","STILL",
-  "STOCK","STOLE","STONE","STOOD","STORE","STORM","STORY","STOVE","STRAP","STRAW",
-  "STRAY","STRIP","STUCK","STUDY","STUFF","STYLE","SUGAR","SUITE","SUPER","SURGE",
-  "SWAMP","SWARM","SWEAR","SWEAT","SWEEP","SWEET","SWEPT","SWIFT","SWING","SWORE",
-  "SWUNG","SYRUP",
-  // T
-  "TABLE","TAKEN","TANGO","TASTE","TEACH","TEETH","TEMPO","THANK","THEME","THICK",
-  "THIEF","THING","THINK","THIRD","THOSE","THREE","THREW","THROW","THUMB","TIDAL",
-  "TIGER","TIGHT","TIMER","TITLE","TODAY","TOKEN","TOTAL","TOUCH","TOUGH","TOWER",
-  "TOXIC","TRACE","TRACK","TRADE","TRAIL","TRAIN","TRAIT","TRASH","TREAT","TREND",
-  "TRIAL","TRIBE","TRICK","TRIED","TROOP","TRUCK","TRULY","TRUMP","TRUNK","TRUST",
-  "TRUTH","TUMOR","TWIST",
-  // U
-  "ULTRA","UNCLE","UNDER","UNDUE","UNION","UNITE","UNITY","UNTIL","UPPER","UPSET",
-  "URBAN","USAGE","USUAL","UTTER",
-  // V
-  "VAGUE","VALID","VALUE","VALVE","VAULT","VENUE","VERSE","VIDEO","VIGOR","VINYL",
-  "VIOLA","VIRUS","VISIT","VISTA","VITAL","VIVID","VOCAL","VODKA","VOICE","VOTER",
-  // W
-  "WAIST","WASTE","WATCH","WATER","WEARY","WEAVE","WEDGE","WEIGH","WEIRD","WHEAT",
-  "WHEEL","WHERE","WHICH","WHILE","WHITE","WHOLE","WHOSE","WIDER","WITCH","WOMAN",
-  "WOMEN","WORLD","WORRY","WORSE","WORST","WORTH","WOULD","WOUND","WRATH","WRIST",
-  "WRITE","WRONG","WROTE",
-  // XYZ
-  "YACHT","YIELD","YOUNG","YOUTH","ZEBRA",
-  // Add the target words too
-  ...TARGET_WORDS,
-  // More near-miss words
-  "SHADE","SHAPE","SHARE","SHALE","SHAME","STALE","STAVE","SLAVE","SNARE",
-  "BASTE","CASTE","BLARE","GLARE","FLARE","SCARE","SPARE","SWEAR","SMEAR",
-  "BOWER","DOWER","SOWER","TOWER","COWER","ROWER","VOWED","TOWED","SOWED",
-  "GRIPE","TRIPE","SWIPE","SNIPE","STRIP","DRAPE","CREPE",
-  "BRINE","SWINE","WHINE","TWINE","SPINE","THINE","OVINE",
-    "STAKE","AWAKE",
-]);
-
-// Families of words that are near-misses to each other
-const WORD_FAMILIES = {
-  "CRANE": ["CRATE", "CRAZE", "TRACE", "GRACE", "BRAVE", "CRANE"],
-  "PLATE": ["PLACE", "PLANE", "SLATE", "SKATE", "PLATE"],
-  "STARE": ["STALE", "STAKE", "SHARE", "SNARE", "SPARE", "STARE"],
-  "SHINE": ["SPINE", "SWINE", "WHINE", "SHONE", "SHINE"],
-  "TRACE": ["GRACE", "BRACE", "TRADE", "TRACK", "TRACE"],
-  "BLAME": ["BLAZE", "BLADE", "FLAME", "BLAME"],
-  "GRAPE": ["GRACE", "GRADE", "GRAVE", "DRAPE", "GRAPE"],
-  "BRIDE": ["BRINE", "BRIBE", "PRIDE", "BRIDE"],
-  "STONE": ["STORE", "STOVE", "STOKE", "STOLE", "ATONE", "STONE"],
-  "PRIDE": ["PRICE", "PRIZE", "PRIME", "BRIDE", "PRIDE"],
-  "FLAME": ["BLAME", "FLAKE", "FRAME", "FLARE", "FLAME"],
-  "GRACE": ["TRACE", "BRACE", "GRADE", "GRAPE", "GRAVE", "GRACE"],
-  "SPINE": ["SHINE", "SWINE", "SPICE", "SPITE", "SPINE"],
-  "SLOPE": ["GLOBE", "SCOPE", "SPOKE", "STOLE", "SLOPE"],
-  "GLOBE": ["GLOVE", "SLOPE", "CLOSE", "GLOBE"],
-  "SWORE": ["SNORE", "STORE", "SHORE", "SCORE", "SWORE"],
-  "SNORE": ["SHORE", "STORE", "SCORE", "SWORE", "SNORE"],
-  "STORE": ["SHORE", "SNORE", "STARE", "STONE", "STORE"],
-  "SHORE": ["SNORE", "STORE", "SCORE", "SHARE", "SHORE"],
-  "SCORE": ["STORE", "SHORE", "SNORE", "SCARE", "SCORE"],
-  "BRAKE": ["BRAVE", "BLAKE", "FLAKE", "SHAKE", "BRAKE"],
-  "FLAKE": ["FLAME", "SHAKE", "BRAKE", "STAKE", "FLAKE"],
-  "SHAKE": ["SHAPE", "SHAME", "SHARE", "SHADE", "SHALE", "SNAKE", "SHAKE"],
-  "STAKE": ["STALE", "STARE", "STATE", "SNAKE", "SHAKE", "STAKE"],
-  "SNAKE": ["SHAKE", "SNARE", "STAKE", "SNAKE"],
-  "LIGHT": ["MIGHT", "NIGHT", "RIGHT", "SIGHT", "TIGHT", "FIGHT", "LIGHT"],
-  "MIGHT": ["LIGHT", "NIGHT", "RIGHT", "SIGHT", "TIGHT", "FIGHT", "MIGHT"],
-  "NIGHT": ["LIGHT", "MIGHT", "RIGHT", "SIGHT", "TIGHT", "FIGHT", "NIGHT"],
-  "RIGHT": ["LIGHT", "MIGHT", "NIGHT", "SIGHT", "TIGHT", "FIGHT", "RIGHT"],
-  "SIGHT": ["LIGHT", "MIGHT", "NIGHT", "RIGHT", "TIGHT", "FIGHT", "SIGHT"],
-  "BLANK": ["CLANK", "PLANK", "BLACK", "BLAND", "BLANK"],
-  "CLANK": ["BLANK", "PLANK", "CRANK", "CLANK"],
-  "CRANK": ["CLANK", "CRACK", "CRANE", "DRANK", "CRANK"],
-  "DRANK": ["CRANK", "DRAIN", "DRAWN", "DRINK", "DRANK"],
-  "PLANK": ["BLANK", "CLANK", "PLANT", "PLANE", "PLANK"],
-  "TRAIN": ["BRAIN", "DRAIN", "GRAIN", "STAIN", "TRAIL", "TRAIT", "TRAIN"],
-  "BRAIN": ["TRAIN", "DRAIN", "GRAIN", "BRAIN"],
-  "DRAIN": ["TRAIN", "BRAIN", "GRAIN", "DRANK", "DRAWN", "DRAIN"],
-  "GRAIN": ["TRAIN", "BRAIN", "DRAIN", "GRAIL", "GRAIN"],
-  "STAIN": ["TRAIN", "STAIR", "SAINT", "SLAIN", "STAIN"],
-  "CLOUD": ["COULD", "CLOUT", "ALOUD", "PROUD", "CLOUD"],
-  "PROUD": ["CLOUD", "PROOF", "PRUDE", "PROWL", "PROUD"],
-  "GROUT": ["TROUT", "SHOUT", "SCOUT", "GROUT"],
-  "SCOUT": ["SHOUT", "GROUT", "SNOUT", "SCOUT"],
-  "SHOUT": ["SCOUT", "GROUT", "SNOUT", "SHOOT", "SHORT", "SHOUT"],
-  "BLINK": ["CLINK", "DRINK", "THINK", "BRINK", "BLIND", "BLINK"],
-  "CLINK": ["BLINK", "DRINK", "THINK", "CLIMB", "CLINK"],
-  "DRINK": ["BLINK", "CLINK", "THINK", "BRINK", "DRANK", "DRINK"],
-  "THINK": ["BLINK", "CLINK", "DRINK", "THICK", "THING", "THINK"],
-  "BRINK": ["BLINK", "DRINK", "BRING", "BRICK", "BRINK"],
-  "CHARM": ["CHAIR", "CHAIN", "SWARM", "ALARM", "CHARM"],
-  "SWARM": ["CHARM", "SWEAR", "SWAMP", "SWARM"],
-  "ALARM": ["CHARM", "ALBUM", "ALARM"],
-  "MOUSE": ["HOUSE", "LOUSE", "MOOSE", "MOUTH", "MOUSE"],
-  "HOUSE": ["MOUSE", "LOUSE", "HORSE", "HOUSE"],
-  "LOUSE": ["MOUSE", "HOUSE", "LOOSE", "LOUSE"],
-  "DOUSE": ["MOUSE", "HOUSE", "LOUSE", "DOUSE"],
-  "MOUND": ["BOUND", "FOUND", "HOUND", "ROUND", "SOUND", "WOUND", "MOUNT", "MOUND"],
-  "BOUND": ["MOUND", "FOUND", "HOUND", "ROUND", "SOUND", "WOUND", "BOUND"],
-  "FOUND": ["BOUND", "MOUND", "HOUND", "ROUND", "SOUND", "WOUND", "FOUND"],
-  "HOUND": ["BOUND", "FOUND", "MOUND", "ROUND", "SOUND", "WOUND", "HOUND"],
-  "ROUND": ["BOUND", "FOUND", "HOUND", "MOUND", "SOUND", "WOUND", "ROUND"],
-  "SOUND": ["BOUND", "FOUND", "HOUND", "MOUND", "ROUND", "WOUND", "SOUND"],
-  "WOUND": ["BOUND", "FOUND", "HOUND", "MOUND", "ROUND", "SOUND", "WOULD", "WOUND"],
-  "PASTE": ["TASTE", "WASTE", "HASTE", "PHASE", "PASTE"],
-  "TASTE": ["PASTE", "WASTE", "HASTE", "TEASE", "TASTE"],
-  "WASTE": ["PASTE", "TASTE", "HASTE", "WASTE"],
-  "HASTE": ["PASTE", "TASTE", "WASTE", "HASTE"],
-  "LINER": ["DINER", "MINER", "FINER", "TIMER", "LINEN", "LIVER", "LINER"],
-  "DINER": ["LINER", "MINER", "FINER", "DIVER", "DINER"],
-  "MINER": ["LINER", "DINER", "FINER", "MINOR", "MINER"],
-  "FINER": ["LINER", "DINER", "MINER", "FIBER", "FINER"],
-  "TIMER": ["LINER", "DINER", "TIGER", "TOWER", "TIMER"],
-  "TOWER": ["POWER", "LOWER", "MOWER", "TOWEL", "TOWER"],
-  "POWER": ["TOWER", "LOWER", "MOWER", "POKER", "POWER"],
-  "LOWER": ["TOWER", "POWER", "MOWER", "LOVER", "LONER", "LOWER"],
-  "MOWER": ["TOWER", "POWER", "LOWER", "MOVER", "MOWER"],
-  "BOWER": ["TOWER", "POWER", "LOWER", "MOWER", "BOXER", "BOWER"],
-  "MANGO": ["TANGO", "MANOR", "MANGO"],
-  "TANGO": ["MANGO", "TANGO"],
-  "PEACH": ["BEACH", "REACH", "TEACH", "LEACH", "PEACE", "PEACH"],
-  "BEACH": ["PEACH", "REACH", "TEACH", "LEACH", "BENCH", "BEACH"],
-  "REACH": ["PEACH", "BEACH", "TEACH", "LEACH", "REACT", "REACH"],
-  "TEACH": ["PEACH", "BEACH", "REACH", "LEACH", "TEETH", "TEACH"],
-  "LEACH": ["PEACH", "BEACH", "REACH", "TEACH", "LEASH", "LEACH"],
-};
-
-// Add all target words and family members to valid words
-for (const key in WORD_FAMILIES) {
-  VALID_WORDS.add(key);
-  WORD_FAMILIES[key].forEach(w => VALID_WORDS.add(w));
+function buildNeighborIndex() {
+  const words = ANSWER_WORDS;
+  for (const word of words) {
+    const neighbors = [];
+    for (const other of words) {
+      if (other === word) continue;
+      let diff = 0;
+      for (let i = 0; i < 5; i++) {
+        if (word[i] !== other[i]) diff++;
+        if (diff > 2) break;
+      }
+      if (diff === 1) neighbors.push(other);
+    }
+    if (neighbors.length > 0) {
+      neighborCache.set(word, neighbors);
+    }
+  }
 }
 
-// Rage-inducing messages shown as toasts
+buildNeighborIndex();
+
+// Get the words with the most 1-letter-away neighbors (most frustrating)
+function getBestTargets() {
+  const entries = [...neighborCache.entries()];
+  entries.sort((a, b) => b[1].length - a[1].length);
+  // Top 200 words with most neighbors = maximum rage potential
+  return entries.slice(0, 200).map(e => e[0]);
+}
+
+const BEST_TARGETS = getBestTargets();
+
+// ============================================================
+// RAGE MESSAGES
+// ============================================================
+
 const RAGE_TOASTS = [
   "SO close! 😩",
   "Almost had it! 🤏",
@@ -277,6 +63,11 @@ const RAGE_TOASTS = [
   "AGHHH so close!",
   "The word is BEGGING you to guess it",
   "Your brain knows it...",
+  "I believe in you (kinda) 🫠",
+  "Soooo close it hurts",
+  "You're basically a genius... almost",
+  "The word is RIGHT there...",
+  "One. Letter. Off. 😤",
 ];
 
 const LOSS_MESSAGES = [
@@ -285,6 +76,8 @@ const LOSS_MESSAGES = [
   "The answer was right there all along...",
   "One letter away, six times in a row 💀",
   "This game owes you an apology",
+  "Literally ONE letter each time... brutal",
+  "The word was hiding in plain sight 🫠",
 ];
 
 // ============================================================
@@ -297,35 +90,19 @@ let currentTile = 0;
 let currentGuess = "";
 let gameOver = false;
 let guessedWords = [];
+let isRevealing = false; // lock input during reveal animation
 
 // ============================================================
-// CORE RIGGING LOGIC
+// CORE EVALUATION
 // ============================================================
 
-/**
- * Pick a target word. We prefer words with large families for maximum pain.
- */
-function pickTargetWord() {
-  // Pick words that have at least 4 family members
-  const goodTargets = TARGET_WORDS.filter(w => {
-    const fam = WORD_FAMILIES[w];
-    return fam && fam.length >= 4;
-  });
-  const pool = goodTargets.length > 0 ? goodTargets : TARGET_WORDS;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-/**
- * Evaluate a guess against the target.
- * Returns array of "correct" | "present" | "absent" for each letter.
- */
 function evaluateGuess(guess, target) {
   const result = Array(5).fill("absent");
   const targetArr = target.split("");
   const guessArr = guess.split("");
   const used = Array(5).fill(false);
 
-  // First pass: correct
+  // First pass: correct (green)
   for (let i = 0; i < 5; i++) {
     if (guessArr[i] === targetArr[i]) {
       result[i] = "correct";
@@ -333,7 +110,7 @@ function evaluateGuess(guess, target) {
     }
   }
 
-  // Second pass: present
+  // Second pass: present (yellow)
   for (let i = 0; i < 5; i++) {
     if (result[i] === "correct") continue;
     for (let j = 0; j < 5; j++) {
@@ -348,99 +125,167 @@ function evaluateGuess(guess, target) {
   return result;
 }
 
-/**
- * Count greens + yellows in an evaluation
- */
-function countHits(evaluation) {
-  return evaluation.filter(e => e === "correct" || e === "present").length;
-}
-
-/**
- * Count only greens
- */
 function countGreens(evaluation) {
   return evaluation.filter(e => e === "correct").length;
 }
 
+function countHits(evaluation) {
+  return evaluation.filter(e => e !== "absent").length;
+}
+
+// ============================================================
+// CORE RIGGING LOGIC - THE SECRET SAUCE
+// ============================================================
+
 /**
- * THE SECRET SAUCE: If the player's guess would win or get very close,
- * dynamically swap the target to a near-miss that keeps most of their
- * greens/yellows but prevents a win. On row 6, occasionally let them win.
+ * Score how "frustrating" a candidate target is relative to a guess.
+ * Higher = more rage-inducing (many greens/yellows but NOT a win)
  */
-function maybeRigTheGame(guess) {
-  const eval_ = evaluateGuess(guess, targetWord);
+function frustrationScore(guess, candidate) {
+  if (guess === candidate) return -1000; // never pick exact match
+  const eval_ = evaluateGuess(guess, candidate);
   const greens = countGreens(eval_);
+  const hits = countHits(eval_);
+  // 4 greens = maximum rage, 3 greens + yellows = very close
+  return greens * 20 + hits * 5;
+}
 
-  // If it's an exact match...
-  if (guess === targetWord) {
-    if (currentRow < 5) {
-      // NOT the last row - swap the target!
-      const family = WORD_FAMILIES[targetWord] || [];
-      // Find a word that ISN'T what they guessed, still gives lots of hits
-      const alternatives = family.filter(w => w !== guess && VALID_WORDS.has(w));
+/**
+ * Find the best alternative target that:
+ * 1. Is NOT the player's guess
+ * 2. Is NOT already guessed
+ * 3. Gives maximum greens/yellows (close but no cigar)
+ * 4. Is consistent with ALL previous evaluations shown to the player
+ */
+function findBestSwap(guess, previousEvals) {
+  let bestWord = null;
+  let bestScore = -Infinity;
 
-      if (alternatives.length > 0) {
-        // Pick the alternative that gives the MOST yellow/green (max frustration)
-        let bestAlt = alternatives[0];
-        let bestScore = 0;
-        for (const alt of alternatives) {
-          const altEval = evaluateGuess(guess, alt);
-          const score = countHits(altEval) * 10 + countGreens(altEval) * 5;
-          if (score > bestScore) {
-            bestScore = score;
-            bestAlt = alt;
-          }
+  // Search through answer words for best near-miss
+  for (const candidate of ANSWER_WORDS) {
+    if (candidate === guess) continue;
+    if (guessedWords.includes(candidate)) continue;
+
+    // CHECK CONSISTENCY: The new target must produce the SAME evaluation
+    // for all previously shown guesses. Otherwise the player would notice
+    // contradictions in their colored tiles.
+    let consistent = true;
+    for (const { word, result } of previousEvals) {
+      const hypothetical = evaluateGuess(word, candidate);
+      for (let i = 0; i < 5; i++) {
+        if (hypothetical[i] !== result[i]) {
+          consistent = false;
+          break;
         }
-        targetWord = bestAlt;
-        return evaluateGuess(guess, targetWord);
       }
-
-      // No family alternatives - pick ANY valid word that gives 3-4 greens
-      const desperate = TARGET_WORDS.filter(w => {
-        if (w === guess || guessedWords.includes(w)) return false;
-        const e = evaluateGuess(guess, w);
-        return countGreens(e) >= 3 && countGreens(e) < 5;
-      });
-      if (desperate.length > 0) {
-        targetWord = desperate[Math.floor(Math.random() * desperate.length)];
-        return evaluateGuess(guess, targetWord);
-      }
+      if (!consistent) break;
     }
-    // Last row or no alternatives: let them win
-    return eval_;
+    if (!consistent) continue;
+
+    const score = frustrationScore(guess, candidate);
+    if (score > bestScore) {
+      bestScore = score;
+      bestWord = candidate;
+    }
   }
 
-  // If they got 4+ greens but not an exact match, and it's not the last row,
-  // consider swapping to keep them at 3 greens instead (pure evil)
-  if (greens >= 4 && currentRow < 4) {
-    const family = WORD_FAMILIES[targetWord] || [];
-    const alternatives = family.filter(w => {
-      if (w === guess || w === targetWord || guessedWords.includes(w)) return false;
-      const e = evaluateGuess(guess, w);
-      return countGreens(e) >= 2 && countGreens(e) <= 3;
-    });
-    if (alternatives.length > 0) {
-      const pick = alternatives[Math.floor(Math.random() * alternatives.length)];
-      targetWord = pick;
+  return bestWord;
+}
+
+/**
+ * The main rigging function. Called on every guess submission.
+ * Decides whether to swap the target to maximize frustration.
+ */
+// Track what evaluations we've shown the player (for consistency checking)
+let shownEvaluations = [];
+
+function maybeRigTheGame(guess) {
+  const currentEval = evaluateGuess(guess, targetWord);
+  const greens = countGreens(currentEval);
+  const hits = countHits(currentEval);
+  const isExactMatch = (guess === targetWord);
+  const isLastRow = (currentRow === 5);
+
+  // ---- RULE 1: Last row (6th guess) - MAYBE let them win ----
+  if (isLastRow) {
+    if (isExactMatch) {
+      // They guessed it on the last try - let them have it (backhanded win)
+      return currentEval;
+    }
+    // Not correct on last row - just show the honest eval, they lose
+    // But first, try to swap to something that gives them 4 greens for max pain
+    const swap = findBestSwap(guess, shownEvaluations);
+    if (swap) {
+      const swapEval = evaluateGuess(guess, swap);
+      const swapGreens = countGreens(swapEval);
+      // If the swap gives more greens than current, use it for extra pain
+      if (swapGreens > greens && swapGreens >= 3) {
+        targetWord = swap;
+        return swapEval;
+      }
+    }
+    return currentEval;
+  }
+
+  // ---- RULE 2: Exact match before last row - ALWAYS swap ----
+  if (isExactMatch) {
+    const swap = findBestSwap(guess, shownEvaluations);
+    if (swap) {
+      targetWord = swap;
       return evaluateGuess(guess, targetWord);
     }
+    // Extremely rare: no consistent swap exists. Let them win.
+    return currentEval;
   }
 
-  // If they have very few hits (0-1), swap to a word that gives them MORE hits
-  // This makes them think they're on the right track (more frustrating)
-  if (countHits(eval_) <= 1 && currentRow < 3) {
-    const betterTargets = TARGET_WORDS.filter(w => {
-      if (guessedWords.includes(w)) return false;
-      const e = evaluateGuess(guess, w);
-      return countHits(e) >= 3 && countGreens(e) >= 1 && countGreens(e) < 5;
-    });
-    if (betterTargets.length > 0) {
-      targetWord = betterTargets[Math.floor(Math.random() * betterTargets.length)];
-      return evaluateGuess(guess, targetWord);
+  // ---- RULE 3: Very close (4 greens) - maybe downgrade to 3 ----
+  if (greens === 4 && currentRow < 4) {
+    // 50% chance to swap to something with 3 greens instead (evil)
+    if (Math.random() < 0.5) {
+      const swap = findBestSwap(guess, shownEvaluations);
+      if (swap) {
+        const swapEval = evaluateGuess(guess, swap);
+        const swapGreens = countGreens(swapEval);
+        if (swapGreens === 3 && countHits(swapEval) >= 4) {
+          targetWord = swap;
+          return swapEval;
+        }
+      }
+    }
+    // Otherwise let the 4 greens stand - it's still rage-inducing
+    return currentEval;
+  }
+
+  // ---- RULE 4: Cold guess (0-1 hits) - warm them up for frustration ----
+  if (hits <= 1 && currentRow <= 2) {
+    const swap = findBestSwap(guess, shownEvaluations);
+    if (swap) {
+      const swapEval = evaluateGuess(guess, swap);
+      const swapHits = countHits(swapEval);
+      const swapGreens = countGreens(swapEval);
+      // Swap only if it gives significantly more hits
+      if (swapHits >= 3 && swapGreens >= 1) {
+        targetWord = swap;
+        return swapEval;
+      }
     }
   }
 
-  return eval_;
+  // ---- RULE 5: Moderate guess (2-3 hits) - try to bump up to 3-4 greens ----
+  if (hits >= 2 && greens <= 2 && currentRow <= 3) {
+    const swap = findBestSwap(guess, shownEvaluations);
+    if (swap) {
+      const swapEval = evaluateGuess(guess, swap);
+      const swapGreens = countGreens(swapEval);
+      const swapHits = countHits(swapEval);
+      if (swapGreens >= 3 && swapHits >= 4 && swapGreens > greens) {
+        targetWord = swap;
+        return swapEval;
+      }
+    }
+  }
+
+  return currentEval;
 }
 
 
@@ -507,11 +352,11 @@ function updateKeyboard(guess, evaluation) {
     const state = evaluation[i];
     // Only upgrade: absent -> present -> correct
     if (state === "correct") {
-      btn.className = "correct";
+      btn.className = btn.classList.contains("wide-btn") ? "wide-btn correct" : "correct";
     } else if (state === "present" && !btn.classList.contains("correct")) {
-      btn.className = "present";
+      btn.className = btn.classList.contains("wide-btn") ? "wide-btn present" : "present";
     } else if (state === "absent" && !btn.classList.contains("correct") && !btn.classList.contains("present")) {
-      btn.className = "absent";
+      btn.className = btn.classList.contains("wide-btn") ? "wide-btn absent" : "absent";
     }
   }
 }
@@ -529,7 +374,7 @@ function revealRow(rowIndex, evaluation, callback) {
         tile.classList.add(evaluation[i]);
       }, 250);
 
-      // After full flip, check if done
+      // After full flip of last tile, run callback
       if (i === 4 && callback) {
         setTimeout(callback, 300);
       }
@@ -558,7 +403,7 @@ function playWinAnimation(rowIndex) {
 }
 
 function submitGuess() {
-  if (gameOver) return;
+  if (gameOver || isRevealing) return;
   if (currentGuess.length !== 5) {
     const row = document.getElementById(`row-${currentRow}`);
     row.classList.add("shake");
@@ -575,14 +420,19 @@ function submitGuess() {
     return;
   }
 
+  isRevealing = true;
+
   // THE RIG: get (possibly manipulated) evaluation
   const evaluation = maybeRigTheGame(currentGuess);
   const isCorrect = currentGuess === targetWord;
 
+  // Record what we showed the player (for consistency checking on future swaps)
+  shownEvaluations.push({ word: currentGuess, result: [...evaluation] });
   guessedWords.push(currentGuess);
 
   revealRow(currentRow, evaluation, () => {
     updateKeyboard(currentGuess, evaluation);
+    isRevealing = false;
 
     if (isCorrect) {
       gameOver = true;
@@ -614,7 +464,7 @@ function submitGuess() {
 }
 
 function handleKey(key) {
-  if (gameOver) return;
+  if (gameOver || isRevealing) return;
 
   if (key === "ENTER") {
     submitGuess();
@@ -645,7 +495,6 @@ function handleKey(key) {
 // EVENT LISTENERS
 // ============================================================
 
-// Keyboard clicks
 keyboard.addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
@@ -653,7 +502,6 @@ keyboard.addEventListener("click", (e) => {
   if (key) handleKey(key);
 });
 
-// Physical keyboard
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 
@@ -666,7 +514,6 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// Play again
 playAgainBtn.addEventListener("click", () => {
   modalOverlay.classList.add("hidden");
   resetGame();
@@ -676,22 +523,29 @@ playAgainBtn.addEventListener("click", () => {
 // INIT
 // ============================================================
 
+function pickTargetWord() {
+  // Pick from BEST_TARGETS (words with most 1-off neighbors) for max frustration
+  if (BEST_TARGETS.length > 0) {
+    return BEST_TARGETS[Math.floor(Math.random() * BEST_TARGETS.length)];
+  }
+  return ANSWER_WORDS[Math.floor(Math.random() * ANSWER_WORDS.length)];
+}
+
 function resetGame() {
   currentRow = 0;
   currentTile = 0;
   currentGuess = "";
   gameOver = false;
   guessedWords = [];
+  shownEvaluations = [];
   targetWord = pickTargetWord();
 
   createBoard();
 
   // Reset keyboard colors
   keyboard.querySelectorAll("button").forEach(btn => {
-    btn.className = "";
-    if (btn.dataset.key === "ENTER" || btn.dataset.key === "BACKSPACE") {
-      btn.classList.add("wide-btn");
-    }
+    const isWide = btn.dataset.key === "ENTER" || btn.dataset.key === "BACKSPACE";
+    btn.className = isWide ? "wide-btn" : "";
   });
 }
 
