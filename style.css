@@ -1,0 +1,361 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #121213;
+  color: #ffffff;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.game-container {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 8px;
+}
+
+/* Header */
+header {
+  width: 100%;
+  text-align: center;
+  border-bottom: 1px solid #3a3a3c;
+  padding: 12px 0;
+  margin-bottom: 16px;
+}
+
+.title-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+h1 {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: #818384;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+/* Board */
+.board {
+  display: grid;
+  grid-template-rows: repeat(6, 1fr);
+  gap: 5px;
+  margin-bottom: 24px;
+  padding: 10px 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+
+.tile {
+  width: 62px;
+  height: 62px;
+  border: 2px solid #3a3a3c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #ffffff;
+  user-select: none;
+  transition: transform 0.1s;
+}
+
+.tile.filled {
+  border-color: #565758;
+  animation: pop 0.1s ease;
+}
+
+.tile.revealed {
+  animation: flip 0.5s ease forwards;
+}
+
+.tile.correct {
+  background-color: #538d4e;
+  border-color: #538d4e;
+}
+
+.tile.present {
+  background-color: #b59f3b;
+  border-color: #b59f3b;
+}
+
+.tile.absent {
+  background-color: #3a3a3c;
+  border-color: #3a3a3c;
+}
+
+/* Shake animation for invalid words */
+.row.shake {
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes flip {
+  0% { transform: rotateX(0deg); }
+  45% { transform: rotateX(90deg); }
+  55% { transform: rotateX(90deg); }
+  100% { transform: rotateX(0deg); }
+}
+
+/* Dance animation for winning */
+.tile.dance {
+  animation: dance 0.5s ease;
+}
+
+@keyframes dance {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-20px); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(-10px); }
+}
+
+/* Almost animation - teasing bounce for near misses */
+.tile.almost {
+  animation: almost-bounce 0.6s ease;
+}
+
+@keyframes almost-bounce {
+  0% { transform: translateY(0) scale(1); }
+  20% { transform: translateY(-15px) scale(1.05); }
+  40% { transform: translateY(0) scale(1); }
+  60% { transform: translateY(-8px) scale(1.02); }
+  80% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background-color: #ffffff;
+  color: #121213;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  animation: toast-in 0.3s ease, toast-out 0.3s ease 1.2s forwards;
+  white-space: nowrap;
+}
+
+.toast.rage {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  color: #fff;
+  font-size: 15px;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Keyboard */
+.keyboard {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.keyboard-row {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.keyboard button {
+  background-color: #818384;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 0;
+  height: 58px;
+  min-width: 43px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  transition: background-color 0.2s;
+  flex: 1;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.keyboard button:hover {
+  opacity: 0.9;
+}
+
+.keyboard button.wide-btn {
+  flex: 1.5;
+  font-size: 12px;
+}
+
+.keyboard button.correct {
+  background-color: #538d4e;
+}
+
+.keyboard button.present {
+  background-color: #b59f3b;
+}
+
+.keyboard button.absent {
+  background-color: #3a3a3c;
+}
+
+.spacer-half {
+  flex: 0.5;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fade-in 0.3s ease;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal {
+  background: #1a1a1b;
+  border: 1px solid #3a3a3c;
+  border-radius: 16px;
+  padding: 40px 32px;
+  text-align: center;
+  max-width: 380px;
+  width: 90%;
+  animation: modal-pop 0.4s ease;
+}
+
+.modal-emoji {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.modal h2 {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.modal-message {
+  color: #818384;
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.modal-word {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #538d4e;
+  margin-bottom: 24px;
+}
+
+.play-again-btn {
+  background: #538d4e;
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  padding: 14px 40px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: background 0.2s;
+}
+
+.play-again-btn:hover {
+  background: #6aaf65;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-pop {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Responsive */
+@media (max-width: 400px) {
+  .tile {
+    width: 52px;
+    height: 52px;
+    font-size: 26px;
+  }
+
+  .keyboard button {
+    height: 50px;
+    min-width: 30px;
+    font-size: 12px;
+  }
+
+  h1 {
+    font-size: 28px;
+  }
+}
